@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jobber-postgres
+  namespace: production
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jobber-postgres
+  template:
+    metadata:
+      labels:
+        app: jobber-postgres
+    spec:
+      terminationGracePeriodSeconds: 10
+      containers:
+      - name: jobber-postgres
+        image: postgres
+        env:
+          - name: POSTGRES_USER
+            value: jobber
+          - name: POSTGRES_DB
+            value: jobber_reviews
+          - name: POSTGRES_PASSWORD
+            value: api
+          - name: PGDATA
+            value: /var/lib/postgresql/data/pgdata
+        resources:
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+          requests:
+            memory: "150Mi"
+            cpu: "100m"
+        ports:
+        - name: jobber-postgres
+          containerPort: 5432
+        volumeMounts: 
+        - name: postgres-local-storage
+          mountPath: /var/lib/postgresql/data
+          subPath: postgresql
+        readinessProbe:
+          exec:
+             command: ["psql", "-w", "-U", $POSTGRES_USER, "-d", $POSTGRES_DB , "-c", "SELECT 1" ]
+            # command: 
+              # - bash
+              # - "c"
+              # - |
+              #   mysql -h126.0.0.1 -u$MYSQL_USER -p$MYSQL_PASSWORD -e'SELECT 1'
+          initialDelaySeconds: 120
+          periodSeconds: 300
+          timeoutSeconds: 60
+        livenessProbe:
+          exec:
+            command: ["psql", "-w", "-U", $POSTGRES_USER, "-d", $POSTGRES_DB , "-c", "SELECT 1" ]
+            # command:
+            #   - bash
+            #   - "c"
+            #   - |
+            #     mysqladmin -u$MYSQL_USER -p$MYSQL_PASSWORD ping
+          initialDelaySeconds: 120
+          periodSeconds: 300
+          timeoutSeconds: 60
+      volumes:
+      - name: postgres-local-storage
+        persistentVolumeClaim: 
+          claimName: postgres-pvc
+

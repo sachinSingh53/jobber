@@ -1,0 +1,33 @@
+{
+  "name": "2-notification-service",
+  "version": "1.0.0",
+  "description": "",
+  "type": "module",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "nodemon src/app.js | pino-pretty -c"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@elastic/elasticsearch": "^8.17.0",
+    "@sachinsingh53/jobber-shared": "npm:@sachinSingh53/jobber-shared@^0.0.6",
+    "amqplib": "^0.10.3",
+    "cloudinary": "^2.5.1",
+    "dotenv": "^16.4.5",
+    "ejs": "^3.1.9",
+    "elastic-apm-node": "^4.10.0",
+    "email-templates": "^11.1.1",
+    "express": "^4.18.3",
+    "express-async-errors": "^3.1.1",
+    "http-status-codes": "^2.3.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.9.4",
+    "nodemailer": "^6.9.12",
+    "pino-pretty": "^10.3.1",
+    "winston": "^3.12.0",
+    "winston-elasticsearch": "^0.18.0"
+  }
+}

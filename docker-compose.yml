@@ -1,0 +1,233 @@
+# docker compose up -d redis mongodb mysql postgres rabbitmq elasticsearch kibana
+version: '3.9'
+services: 
+  redis: 
+    container_name: redis_container
+    image: redis:alpine
+    restart: always
+    ports: 
+      - '6379:6379'
+    command: redis-server --loglevel warning
+    volumes: 
+      - ./docker-volumes/cache:/data
+
+
+  mongodb:
+    container_name: mongodb_container
+    image: mongo:latest
+    restart: always
+    ports: 
+      - '27017:27017'
+    volumes: 
+      - ./docker-volumes/data:/data/db
+
+
+  mysql:
+    container_name: mysql_container
+    image: mysql
+    command: --default-authentication-plugin=mysql_native_password
+    restart: always
+    environment:
+      - MYSQL_USER=jobber
+      - MYSQL_DATABASE=jobber_auth
+      - MYSQL_ROOT_PASSWORD=api
+      - MYSQL_PASSWORD=api
+    ports: 
+      - '3306:3306'
+    volumes: 
+      - ./docker-volumes/mysql:/var/lib/mysql
+
+
+  postgres:
+    container_name: postgres_container
+    image: postgres
+    restart: always
+    environment:
+      - POSTGRES_USER=jobber
+      - POSTGRES_PASSWORD=api
+      - POSTGRES_DB=jobber_reviews
+    ports: 
+      - '5432:5432'
+    volumes: 
+      - ./docker-volumes/postgres:/var/lib/postgresql
+
+
+  rabbitmq: 
+    container_name: rabbitmq_container
+    image: rabbitmq:3.13-rc-management-alpine
+    restart: always
+    environment:
+      - RABBITMQ_DEFAULT_USER=jobber
+      - RABBITMQ_DEFAULT_PASS=admin1234
+    ports: 
+      # AMQP protocol port
+      - '5672:5672'
+      # MANAGEMENT UI
+      - '15672:15672'
+
+
+  gateway:
+    container_name: geteway_container
+    build: 
+      context: server/1-gateway-service
+      dockerfile: Dockerfile.dev
+    restart: always
+    # volumes:
+    #   - ./server/2-notification-service:/app/src
+    ports:
+      - 4000:4000
+    env_file: server/1-gateway-service/.env
+    environment:
+    - GATEWAY_JWT_TOKEN=7b3849a6465a5694200965646ea5a56f
+    - JWT_TOKEN=684a9baf42b1f14080f41827b0af2265
+    - NODE_ENV=development
+    - SECRET_KEY_ONE=62dcec691d0e8ef9b850e664ed91f3b4
+    - SECRET_KEY_TWO=4f496e5247b16397e0934929656f157e
+    - CLIENT_URL=http://localhost:3000
+    - AUTH_BASE_URL=http://localhost:4002
+    - USER_BASE_URL=http://localhost:4003
+    - GIG_BASE_URL=http://localhost:4004
+    - MESSAGE_BASE_URL=http://localhost:4005
+    - ORDER_BASE_URL=http://localhost:4006
+    - REVIEW_BASE_URL=http://localhost:4007
+    - REDIS_HOST=redis://redis:6379
+    depends_on:
+      - redis
+
+
+  notifications:
+    container_name: notification_container
+    build: 
+      context: server/2-notification-service
+      dockerfile: Dockerfile.dev
+    restart: always
+    # volumes:
+    #   - ./server/2-notification-service:/app/src
+    ports:
+      - 4001:4001
+    env_file: server/2-notification-service/.env
+    environment:
+      - ENABLE_APM=0
+      - NODE_ENV=development
+      - CLIENT_URL=http://localhost:3000
+      - RABBITMQ_ENDPOINT=amqp://jobber:admin1234@rabbitmq:5672
+      - SENDER_EMAIL=cornell94@ethereal.email
+      - SENDER_EMAIL_PASSWORD=xe1Qem46xDX2FwrEAD
+      - ELASTIC_SEARCH_URL = http://elasticsearch_container:9200
+      - ELASTIC_APM_SERVER_URL=http://localhost:8200
+      - ELASTIC_APM_SECRET_TOKEN= 
+    depends_on:
+      - rabbitmq
+
+
+  elasticsearch: 
+    container_name: elasticsearch_container
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.1
+    restart: always
+    environment: 
+      ES_JAVA_OPTS: -Xmx1g -Xms1g
+      bootstrap.memory_lock: "true"
+      discovery.type: single-node
+      network.host: 0.0.0.0
+      transport.host: 127.0.0.1
+      http.host: 0.0.0.0
+      xpack.security.enabled: "true"
+      xpack.security.authc.api_key.enabled: "true"
+      xpack.monitoring.collection.enabled: "true"
+      xpack.security.enrollment.enabled: "true"
+      xpack.security.authc.token.enabled: "true"
+      ELASTIC_PASSWORD: admin1234
+    ports: 
+      - '9200:9200'
+      - '9300:9300'
+    volumes:
+      - ./docker-volumes/elasticsearch-data:/usr/share/elasticsearch/data
+    networks: 
+      - elastic
+
+
+  kibana: 
+    container_name: kibana_container
+    image: docker.elastic.co/kibana/kibana:8.12.1
+    restart: always
+    environment: 
+      - ELASTICSEARCH_HOSTS=["http://elasticsearch_container:9200"]
+      - ELASTICSEARCH_USERNAME=kibana_system
+      - ELASTICSEARCH_PASSWORD=kibana
+      - ELASTICSEARCH_SERVICEACCOUNT_TOKEN=AAEAAWVsYXN0aWMva2liYW5hL2pvYmJlci1raWJhbmE6WHRtNnFzOURTdlN1LWxwbFl2OVdOdw
+      - XPACK_FLEET_AGENTS_ELASTICSEARCH_HOSTS=["http://elasticsearch_container:9200"]
+      
+    ports: 
+      - '5601:5601'
+    networks: 
+      - elastic
+    volumes: 
+      - ./kibana.yml/:/usr/share/kibana/config/kibana.yml:ro
+    depends_on: 
+      - elasticsearch
+
+
+  apmServer:
+    image: docker.elastic.co/apm/apm-server:8.12.1
+    container_name: apm_server_container
+    ports:
+      - 8200:8200
+    volumes:
+      - ./apm-server.yml:/usr/share/apm-server/apm-server.yml:ro
+    networks:
+      - elastic
+    command: >
+      apm-server -e
+        -E apm-server.rum.enabled=true
+        -E setup.kibana.host=kibana_container:5601
+        -E setup.template.settings.index.number_of_replicas=0
+        -E apm-server.kibana.enabled=true
+        -E apm-server.kibana.host=kibana_container:5601
+        -E apm-server.kibana.protocol=http
+        -E strict.perms=false
+        -E apm-server.auth.anonymous.enabled=true
+
+
+  metricbeat:
+    container_name: metricbeat_container
+    image: docker.elastic.co/beats/metricbeat:8.12.1
+    user: root
+    ports:
+      - 5066:5066
+    networks:
+      - elastic
+    volumes:
+      - ./metricbeat.yml/:/usr/share/metricbeat/metricbeat.yml:ro
+      # docker module
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # system module
+      - /sys/fs/cgroup:/hostfs/sys/fs/cgroup:ro
+      - /proc:/hostfs/proc:ro
+      - /:/hostfs:ro
+    command: ["--strict.perms=false", "-system.hostfs=/hostfs"]
+    depends_on: 
+      - elasticsearch
+
+
+  heartbeat:
+    container_name: heartbeat_container
+    image: docker.elastic.co/beats/heartbeat:8.12.1
+    user: root
+    hostname: heartbeat
+    cap_add:
+      - NET_RAW
+    networks:
+      - elastic
+    command: ["--strict.perms=false"]
+    volumes:
+      - ./heartbeat.yml:/usr/share/heartbeat/heartbeat.yml:ro
+    depends_on: 
+      - elasticsearch
+
+networks: 
+  elastic: 
+    name: elastic
+
+
+
+# curl -s -X POST -u elastic:admin1234 -H "Content-Type: application/json" http://localhost:9200/_security/user/kibana_system/_password -d "{\"password\":\"kibana\"}"
