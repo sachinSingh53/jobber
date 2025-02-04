@@ -16,54 +16,44 @@ spec:
       terminationGracePeriodSeconds: 10
       containers:
       - name: jobber-postgres
-        image: postgres
+        image: postgres:latest
+        imagePullPolicy: IfNotPresent
         env:
-          - name: POSTGRES_USER
-            value: jobber
-          - name: POSTGRES_DB
-            value: jobber_reviews
-          - name: POSTGRES_PASSWORD
-            value: api
-          - name: PGDATA
-            value: /var/lib/postgresql/data/pgdata
+        - name: POSTGRES_USER
+          value: jobber
+        - name: POSTGRES_PASSWORD
+          value: api
+        - name: POSTGRES_DB
+          value: jobber_reviews
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
         resources:
           limits:
             memory: "1Gi"
-            cpu: "500m"
+            cpu: "0.5"
           requests:
-            memory: "150Mi"
-            cpu: "100m"
+            cpu: 100m
+            memory: 150Mi
         ports:
         - name: jobber-postgres
           containerPort: 5432
-        volumeMounts: 
+        volumeMounts:
         - name: postgres-local-storage
           mountPath: /var/lib/postgresql/data
-          subPath: postgresql
+          subPath: postgres
         readinessProbe:
           exec:
-             command: ["psql", "-w", "-U", $POSTGRES_USER, "-d", $POSTGRES_DB , "-c", "SELECT 1" ]
-            # command: 
-              # - bash
-              # - "c"
-              # - |
-              #   mysql -h126.0.0.1 -u$MYSQL_USER -p$MYSQL_PASSWORD -e'SELECT 1'
+            command: ["pg_isready" ,"-U" ,"$(POSTGRES_USER)", "-d" ,"$(POSTGRES_DB)"]
           initialDelaySeconds: 120
           periodSeconds: 300
           timeoutSeconds: 60
         livenessProbe:
           exec:
-            command: ["psql", "-w", "-U", $POSTGRES_USER, "-d", $POSTGRES_DB , "-c", "SELECT 1" ]
-            # command:
-            #   - bash
-            #   - "c"
-            #   - |
-            #     mysqladmin -u$MYSQL_USER -p$MYSQL_PASSWORD ping
+            command: ["pg_isready" ,"-U" ,"$(POSTGRES_USER)", "-d" ,"$(POSTGRES_DB)"]
           initialDelaySeconds: 120
           periodSeconds: 300
           timeoutSeconds: 60
       volumes:
       - name: postgres-local-storage
-        persistentVolumeClaim: 
+        persistentVolumeClaim:
           claimName: postgres-pvc
-

@@ -35,3 +35,10 @@ spec:
         - name: mgmt
           containerPort: 15672
           protocol: TCP
+        volumeMounts:
+          - name: rabbittmq-local-storage
+            mountPath: /var/lib/rabbitmq
+      volumes:
+        - name: rabbittmq-local-storage
+          persistentVolumeClaim:
+            claimName: rabbitmq-pvc

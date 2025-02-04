@@ -8,6 +8,6 @@ spec:
   selector:
     app: jobber-postgres
   ports:
-  - name : jobber-postgres
+  - name: jobber-postgres
     port: 5432
     targetPort: 5432
