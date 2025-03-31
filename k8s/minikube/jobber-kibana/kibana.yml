@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jobber-kibana
+  namespace: production
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jobber-kibana
+  template:
+    metadata:
+      labels:
+        app: jobber-kibana
+    spec:
+      containers:
+      - name: jobber-kibana
+        image: docker.elastic.co/kibana/kibana:8.12.1
+        resources:
+          limits:
+            memory: "1Gi"
+            cpu: "1500m"
+          requests:
+            cpu: 250m
+            memory: 1Gi
+        env:
+          - name: ELASTICSEARCH_HOSTS
+            #http://<service-name>.<namespace>.svc.cluster.local:<port>
+            value: http://jobber-elastic.production.svc.cluster.local:9200
+          - name: ELASTICSEARCH_PASSWORD
+            value: 'admin1234'
+        ports:
+        - name: jobber-kibana
+          containerPort: 5601
